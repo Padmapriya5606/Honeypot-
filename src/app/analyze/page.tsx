@@ -31,6 +31,7 @@ export default function AnalyzePage() {
     const [phase, setPhase] = useState<Phase>("input")
     const [inputMessage, setInputMessage] = useState("")
     const [result, setResult] = useState<ResultData | null>(null)
+    const [error, setError] = useState<string | null>(null)
 
     const [visibleChat, setVisibleChat] = useState<ChatMessage[]>([])
     const chatEndRef = useRef<HTMLDivElement>(null)
@@ -44,6 +45,7 @@ export default function AnalyzePage() {
     const handleAnalyze = async () => {
         if (!inputMessage.trim()) return
         setPhase("analyzing")
+        setError(null)
 
         try {
             const res = await fetch("/api/analyze", {
@@ -51,16 +53,35 @@ export default function AnalyzePage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: inputMessage })
             })
-            const data = await res.json()
-            setResult(data)
 
-            if (data.conversation && data.conversation.length > 0) {
-                simulateChat(data.conversation)
+            const data = await res.json()
+
+            if (!res.ok || data.error) {
+                throw new Error(data.error || "Analysis failed")
+            }
+
+            // Construct a conversation for simulation
+            const conversation: ChatMessage[] = [
+                { role: "scammer", content: inputMessage }
+            ];
+
+            if (data.honeypotReply) {
+                conversation.push({ role: "honeypot", content: data.honeypotReply });
+            }
+
+            setResult({
+                ...data,
+                conversation: conversation
+            })
+
+            if (conversation.length > 0) {
+                simulateChat(conversation)
             } else {
                 setPhase("result")
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error("Analysis failed", e)
+            setError(e.message || "Something went wrong during analysis")
             setPhase("input")
         }
     }
@@ -120,8 +141,15 @@ export default function AnalyzePage() {
                                 onChange={(e) => setInputMessage(e.target.value)}
                             />
                             <div className="flex items-center justify-between p-6 bg-slate-950/50 rounded-b-[38px] border-t border-white/5">
-                                <div className="flex items-center gap-3 text-[11px] font-bold text-slate-600 uppercase tracking-[0.2em]">
-                                    <Info className="w-4 h-4 text-sky-500/50" /> Secure Sandbox Protocol
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-3 text-[11px] font-bold text-slate-600 uppercase tracking-[0.2em]">
+                                        <Info className="w-4 h-4 text-sky-500/50" /> Secure Sandbox Protocol
+                                    </div>
+                                    {error && (
+                                        <div className="text-rose-500 text-xs font-bold animate-pulse">
+                                            Error: {error} (Check your API Key in .env.local)
+                                        </div>
+                                    )}
                                 </div>
                                 <button
                                     onClick={handleAnalyze}
@@ -224,13 +252,46 @@ export default function AnalyzePage() {
                                 <div className="space-y-6">
                                     <span className="text-[11px] text-slate-500 uppercase font-black block mb-6 tracking-[0.2em]">{t("evidence_extraction")}</span>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {result.reasons.map((r, i) => (
+                                        {result.reasons?.map((r, i) => (
                                             <div key={i} className="flex gap-4 text-slate-300 text-lg bg-slate-950/60 p-6 rounded-3xl border border-white/5 hover:border-sky-500/20 transition-all">
                                                 <div className="mt-2 w-2 h-2 rounded-full bg-sky-500 shadow-[0_0_10px_rgba(55,189,248,0.5)] flex-shrink-0" />
                                                 <span className="font-semibold">{r}</span>
                                             </div>
                                         ))}
+                                        {(!result.reasons || result.reasons.length === 0) && (
+                                            <div className="col-span-2 text-slate-500 italic text-center py-4">
+                                                No specific reasons provided by behavioral analysis.
+                                            </div>
+                                        )}
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* New Interaction Log Section */}
+                            <div className="bg-slate-900/30 border border-white/5 rounded-[40px] p-10 mb-12 backdrop-blur-md">
+                                <div className="flex items-center gap-3 mb-8">
+                                    <Activity className="w-5 h-5 text-sky-400" />
+                                    <h3 className="text-xl font-black text-white uppercase tracking-wider">{t("engagement_log") || "Engagement Log"}</h3>
+                                </div>
+                                <div className="space-y-6 max-h-[400px] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-white/10">
+                                    {visibleChat.map((msg, i) => (
+                                        <div key={i} className={cn("flex flex-col gap-2", msg.role === "honeypot" ? "items-end" : "items-start")}>
+                                            <div className={cn(
+                                                "text-[9px] font-black uppercase tracking-widest opacity-40 px-2",
+                                                msg.role === "honeypot" ? "text-sky-400" : "text-slate-400"
+                                            )}>
+                                                {msg.role === "honeypot" ? "Honeypot Decoy" : "Suspect Actor"}
+                                            </div>
+                                            <div className={cn(
+                                                "px-6 py-4 rounded-2xl max-w-[85%] text-sm font-medium",
+                                                msg.role === "honeypot"
+                                                    ? "bg-sky-500/10 border border-sky-500/20 text-sky-100 rounded-tr-none"
+                                                    : "bg-slate-800/50 border border-white/5 text-slate-200 rounded-tl-none"
+                                            )}>
+                                                {msg.content}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 
