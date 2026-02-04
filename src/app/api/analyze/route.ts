@@ -10,7 +10,11 @@ export async function POST(req: Request) {
         const { message, conversationHistory = "" } = await req.json()
 
         if (!process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
-            return NextResponse.json({ error: "API Key missing. Please add NEXT_PUBLIC_GEMINI_API_KEY to .env.local" }, { status: 500 })
+            const isProd = process.env.NODE_ENV === "production";
+            const message = isProd
+                ? "API Key missing in Production. Please add NEXT_PUBLIC_GEMINI_API_KEY to your Vercel/Hosting environment variables."
+                : "API Key missing in Development. Please add NEXT_PUBLIC_GEMINI_API_KEY to .env.local and restart your server.";
+            return NextResponse.json({ error: message }, { status: 500 })
         }
 
         const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" })

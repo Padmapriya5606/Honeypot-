@@ -146,8 +146,8 @@ export default function AnalyzePage() {
                                         <Info className="w-4 h-4 text-sky-500/50" /> Secure Sandbox Protocol
                                     </div>
                                     {error && (
-                                        <div className="text-rose-500 text-xs font-bold animate-pulse">
-                                            Error: {error} (Check your API Key in .env.local)
+                                        <div className="text-rose-500 text-xs font-bold bg-rose-500/10 p-3 rounded-xl border border-rose-500/20 animate-pulse">
+                                            ⚠️ {error}
                                         </div>
                                     )}
                                 </div>
